@@ -1,18 +1,16 @@
 local displayMode1 = 1
-local displayMode2 = 2
+local displayMode2 = 3
 local display1Set = true
 local display2Set = true
 local listenForKey = false
-local lastInput = input.get()
 local objects = {}
 local temp2
 local temp
 local screenX, screenY
-local speedX, speedY
 
 local funcTbl = {
 	[1] = function(x) drawGameDetails(x) end,
-	[2] = function(x) drawHitDetails(x) end,
+	[2] = function(x) drawhitDetails(x) end,
 	[3] = function(x) drawMotDetails(x) end
 }
 
@@ -26,7 +24,7 @@ function main()
 	--create the array of hitboxes and hurtboxes addresses to draw
 	createObjectArray()
 
-	--display things on the left screen
+	--display things on the top and bottom screens
 	dispTopBottom()
 end
 
@@ -98,6 +96,8 @@ function dispTopBottom()
 
 	if (displayMode1 == 2 or displayMode2 == 2) then
 		drawHitBoxes()
+	else
+		drawMotCenter()
 	end
 end
 
@@ -123,25 +123,36 @@ function drawGameDetails(Yoffset)
 end
 
 --function #2
-function drawHitDetails(Yoffset)
-	gui.drawbox(0,Yoffset-1,255,(#objects+1)*8+Yoffset-1,0x000000a4,0x000000FF)
+function drawhitDetails(Yoffset)
+	gui.drawbox(0,Yoffset-1,127,(#objects+1)*8+Yoffset-1,0x00000080,0x000000FF)
 	gui.text(0*(256/8),Yoffset,"Indx")
 	gui.text(1*(256/8),Yoffset,"Dmg")
 	gui.text(2*(256/8),Yoffset,"Efct")
 	gui.text(3*(256/8),Yoffset,"Pwr")
 	for i=1,#objects do
-		gui.text(0*(256/8), i*8+Yoffset, objects[i][2][2])--index
-		gui.text(1*(256/8), i*8+Yoffset, objects[i][2][7])--dmg
-		local efct = getEfctName(objects[i][2][8])--efct
+		gui.text(0*(256/8), i*8+Yoffset, objects[i][2])--index
+		gui.text(1*(256/8), i*8+Yoffset, objects[i][3][6])--dmg
+		local efct = getEfctName(objects[i][3][7])--efct
 		gui.text(2*(256/8), i*8+Yoffset, efct)--writes a text name for efct
-		gui.text(3*(256/8), i*8+Yoffset, objects[i][2][9])--pwr
-		gui.text(4*(256/8), i*8+Yoffset, bit.tohex(objects[i][1]))
+		gui.text(3*(256/8), i*8+Yoffset, objects[i][3][8])--pwr
 	end
 end
 
 --function #3
 function drawMotDetails(Yoffset)
-	--Temp
+	gui.drawbox(0,Yoffset-1,255,(#objects+1)*8+Yoffset-1,0x00000080,0x000000FF)
+	gui.text(0*(256/8), Yoffset, "Indx")
+	gui.text(1*(256/8), Yoffset, "PosX")
+	gui.text(3.5*(256/8), Yoffset, "PosY")
+	gui.text(6*(256/8), Yoffset, "SpdX")
+	gui.text(7*(256/8), Yoffset, "SpdY")
+	for i=1,#objects do
+		gui.text(0*(256/8), i*8+Yoffset, objects[i][2])
+		gui.text(1*(256/8), i*8+Yoffset, objects[i][4][2])
+		gui.text(3.5*(256/8), i*8+Yoffset, objects[i][4][3])
+		gui.text(6*(256/8), i*8+Yoffset, objects[i][4][4])
+		gui.text(7*(256/8), i*8+Yoffset, objects[i][4][5])
+	end
 end
 
 function createObjectArray()
@@ -168,35 +179,59 @@ end
 
 function setObjectDetails(index,address)
 	--objects = {{object1}, {object2}...} where
-	--{object#} = {Main Address, {Hit Details}, {Mot details}...}
+	--{object#} = {Main Address, Index, {Hit Details}, {Mot details}...}
+
+	table.insert(objects[index], index)--object[i][2] = index in the list
 
 	--HIT DETAILS:
-	local HitDetails = {}
-	table.insert(objects[index],HitDetails)
+	local hitDetails = {}
+	table.insert(objects[index],hitDetails)
 
 	temp = memory.readdword(address+0x14)
-	table.insert(HitDetails, temp)--1: Addr
-	table.insert(HitDetails, index)--2: index in the list
-	table.insert(HitDetails, memory.readwordsigned(address+0x24)-screenX)--3: X1
-	table.insert(HitDetails, memory.readwordsigned(address+0x26)-screenY)--4: Y1
-	table.insert(HitDetails, memory.readwordsigned(address+0x28)-screenX)--5: X2
-	table.insert(HitDetails, memory.readwordsigned(address+0x2a)-screenY)--6: Y2
-	table.insert(HitDetails, memory.readwordsigned(temp+0x4))--7: Dmg
-	table.insert(HitDetails, memory.readbyte(temp+0xa))--8: Efct
-	table.insert(HitDetails, memory.readbytesigned(temp+0xb))--9: Pwr
+	table.insert(hitDetails, temp)--1: Address of hitboxes
+	table.insert(hitDetails, memory.readwordsigned(address+0x24)-screenX)--2: X1
+	table.insert(hitDetails, memory.readwordsigned(address+0x26)-screenY)--3: Y1
+	table.insert(hitDetails, memory.readwordsigned(address+0x28)-screenX)--4: X2
+	table.insert(hitDetails, memory.readwordsigned(address+0x2a)-screenY)--5: Y2
+	table.insert(hitDetails, memory.readwordsigned(temp+0x4))--6: Dmg
+	table.insert(hitDetails, memory.readbyte(temp+0xa))--7: Efct
+	table.insert(hitDetails, memory.readbytesigned(temp+0xb))--8: Pwr
 
 	--MOT DETAILS:
+	local motDetails = {}
+	table.insert(objects[index], motDetails)
+
 	temp = memory.readdword(address+0x38)
-	speedX = memory.readwordsigned(temp+0x88)/256
-	speedY = memory.readwordsigned(temp+0x8c)/256
+	table.insert(motDetails, temp)--1: Addr
+	table.insert(motDetails, memory.readdwordsigned(temp+0x80)/0x10000)--2: PosX
+	table.insert(motDetails, memory.readdwordsigned(temp+0x84)/0x10000)--3: PosY
+	table.insert(motDetails, memory.readwordsigned(temp+0x88))--4: SpeedX
+	table.insert(motDetails, memory.readwordsigned(temp+0x8a))--5: SpeedY
+
 end
 
 function drawHitBoxes()
 	for i=1, #objects do
-		HitDetails = objects[i][2]
-		local EfctColor = getEfctColor(HitDetails[8])
-		gui.box(HitDetails[3],HitDetails[4]-191,HitDetails[5],HitDetails[6]-191,EfctColor)
-		gui.text(HitDetails[5],HitDetails[4]-191,HitDetails[2])
+		hitDetails = objects[i][3]
+		local EfctColor = getEfctColor(hitDetails[7])
+		gui.box(hitDetails[2],hitDetails[3]-191,hitDetails[4],hitDetails[5]-191,EfctColor)
+		gui.text(hitDetails[4],hitDetails[3]-191,objects[i][2])
+	end
+end
+
+function drawMotCenter()
+	for i=1,#objects do
+		motDetails = objects[i][4]
+		local color = 0x000080FF
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY,color)--middle
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY+1,color)--top
+		gui.pixel(motDetails[2]-screenX+1,motDetails[3]-192-screenY,color)--right
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY-1,color)--bottom
+		gui.pixel(motDetails[2]-screenX-1,motDetails[3]-192-screenY,color)--left
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY+2,color)--top
+		gui.pixel(motDetails[2]-screenX+2,motDetails[3]-192-screenY,color)--right
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY-2,color)--bottom
+		gui.pixel(motDetails[2]-screenX-2,motDetails[3]-192-screenY,color)--left
 	end
 end
 
@@ -228,7 +263,7 @@ function getEfctColor(EffectID)
 	if EffectID == 0 then
 		color = 0x8000f060 --blue, less opacity
 	elseif EffectID == 1 then
-		color = 0xf0f0f050 --white
+		color = 0xf0f0f080 --white
 	elseif EffectID == 2 then
 		color = 0x00f00050 --green
 	elseif EffectID == 3 then
