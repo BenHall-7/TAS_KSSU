@@ -94,18 +94,17 @@ function dispTopBottom()
 		funcTbl[displayMode2](bottomOffset)
 	end
 
-	if (displayMode1 == 2 or displayMode2 == 2) then
+	if (not (displayMode1 == 0 and displayMode2 == 0)) then
 		drawHitBoxes()
-	else
-		drawMotCenter()
 	end
+	drawMotCenter()
 end
 
 --function #1
 function drawGameDetails(Yoffset)
 	if movie.playing() == true then
 		gui.drawtext(0,Yoffset,"frame: "..movie.framecount().."/"..movie.length())
-		if movie.framecount < 600 then
+		if movie.framecount() < 600 then
 			gui.drawtext(0,Yoffset+8,"rerecords: "..movie.rerecordcount())
 		end
 	else
@@ -164,8 +163,8 @@ function createObjectArray()
 	--initialize the object tables with addresses
 	for i=0x1,0x20 do
 		temp = memory.readdword(0x02076f00+4*(i-1))
-		while (temp ~= 0 and #objects < 24) do
-			--give the table a maximum size of 24 just 'cause
+		while (temp ~= 0 and #objects < 20) do
+			--give the table a maximum size of 20 so it doesn't fill the whole screen
 			table.insert(objects,{temp})
 			temp2 = temp
 			temp = memory.readdword(temp2)
@@ -214,8 +213,8 @@ function drawHitBoxes()
 	for i=1, #objects do
 		hitDetails = objects[i][3]
 		local EfctColor = getEfctColor(hitDetails[7])
-		gui.box(hitDetails[2],hitDetails[3]-191,hitDetails[4],hitDetails[5]-191,EfctColor)
-		gui.text(hitDetails[4],hitDetails[3]-191,objects[i][2])
+		gui.box(hitDetails[2],hitDetails[3]-191,hitDetails[4],hitDetails[5]-191,EfctColor, 0xF0F0F080)
+		gui.text(hitDetails[4]+1,hitDetails[3]-191,objects[i][2])
 	end
 end
 
@@ -224,13 +223,13 @@ function drawMotCenter()
 		motDetails = objects[i][4]
 		local color = 0x000080FF
 		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY,color)--middle
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY+1,color)--top
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY+1,color)--bottom
 		gui.pixel(motDetails[2]-screenX+1,motDetails[3]-192-screenY,color)--right
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY-1,color)--bottom
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY-1,color)--top
 		gui.pixel(motDetails[2]-screenX-1,motDetails[3]-192-screenY,color)--left
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY+2,color)--top
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY+2,color)--bottom
 		gui.pixel(motDetails[2]-screenX+2,motDetails[3]-192-screenY,color)--right
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY-2,color)--bottom
+		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY-2,color)--top
 		gui.pixel(motDetails[2]-screenX-2,motDetails[3]-192-screenY,color)--left
 	end
 end
@@ -261,17 +260,17 @@ function getEfctColor(EffectID)
 	local color
 
 	if EffectID == 0 then
-		color = 0x8000f060 --blue, less opacity
+		color = 0x4040f080 --blue
 	elseif EffectID == 1 then
-		color = 0xf0f0f080 --white
+		color = 0xf0f0f090 --white
 	elseif EffectID == 2 then
-		color = 0x00f00050 --green
+		color = 0x00f00070 --green
 	elseif EffectID == 3 then
-		color = 0xf0000050 --red
+		color = 0xf0000070 --red
 	elseif EffectID == 4 then
-		color = 0x00f0f050 --cyan
+		color = 0x00f0f070 --cyan
 	elseif EffectID == 5 then
-		color = 0xf0f00050 --yellow
+		color = 0xf0f00070 --yellow
 	else
 		color = 0xa0a0a050 --gray
 	end
