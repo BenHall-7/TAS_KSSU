@@ -3,6 +3,7 @@ local displayMode2 = 3
 local display1Set = true
 local display2Set = true
 local listenForKey = false
+local baseObjects = {}
 local objects = {}
 local temp2
 local temp
@@ -114,6 +115,15 @@ function drawGameDetails(Yoffset)
 	gui.drawtext(0,Yoffset+24,"Part: "..memory.readbyte(0x0205b665))
 	gui.drawtext(1,Yoffset+32,"Map: "..memory.readbyte(0x0205b666))
 
+	local rng = memory.readword(0x0204219c)
+	gui.drawbox(212,Yoffset-1,255,Yoffset+7,0x00000080, 0x00000080)
+	gui.drawtext(213,Yoffset,"rng:"..string.format("%3x",rng))
+	for i=1,3 do
+		rng = bit.band(rng * 0x3d + 0x79 + 0x500,0xfff)
+		gui.drawbox(212,Yoffset + 8*i,255,Yoffset+7 + 8*i,0x00000080, 0x00000080)
+		gui.drawtext(213,Yoffset + 8*i,"   :"..string.format("%3x",rng))
+	end
+
 	gui.drawtext(0,Yoffset+191-8,"0x"..string.format("%x",memory.readword(0x0209f340)))
 	gui.drawtext(0,Yoffset+191-16,bit.tohex(memory.readdword(0x0209f340+0x2c)))
 	gui.drawtext(0,Yoffset+191-24,bit.tohex(memory.readdword(0x0209f340+0x30)))
@@ -139,18 +149,18 @@ end
 
 --function #3
 function drawMotDetails(Yoffset)
-	gui.drawbox(0,Yoffset-1,255,(#objects+1)*8+Yoffset-1,0x00000080,0x000000FF)
+	gui.drawbox(0,Yoffset-1,255,(#baseObjects+1)*8+Yoffset-1,0x00000080,0x000000FF)
 	gui.text(0*(256/8), Yoffset, "Indx")
 	gui.text(1*(256/8), Yoffset, "PosX")
 	gui.text(3.5*(256/8), Yoffset, "PosY")
 	gui.text(6*(256/8), Yoffset, "SpdX")
 	gui.text(7*(256/8), Yoffset, "SpdY")
-	for i=1,#objects do
-		gui.text(0*(256/8), i*8+Yoffset, objects[i][2])
-		gui.text(1*(256/8), i*8+Yoffset, objects[i][4][2])
-		gui.text(3.5*(256/8), i*8+Yoffset, objects[i][4][3])
-		gui.text(6*(256/8), i*8+Yoffset, objects[i][4][4])
-		gui.text(7*(256/8), i*8+Yoffset, objects[i][4][5])
+	for i=1,#baseObjects do
+		gui.text(0*(256/8), i*8+Yoffset, baseObjects[i][2])
+		gui.text(1*(256/8), i*8+Yoffset, baseObjects[i][3])
+		gui.text(3.5*(256/8), i*8+Yoffset, baseObjects[i][4])
+		gui.text(6*(256/8), i*8+Yoffset, baseObjects[i][5])
+		gui.text(7*(256/8), i*8+Yoffset, baseObjects[i][6])
 	end
 end
 
@@ -161,10 +171,10 @@ function createObjectArray()
 	end
 
 	--initialize the object tables with addresses
-	for i=0x1,0x20 do
+	for i=0x2,0x20 do --don't show command grab ranges because they block out stuff
 		temp = memory.readdword(0x02076f00+4*(i-1))
-		while (temp ~= 0 and #objects < 20) do
-			--give the table a maximum size of 20 so it doesn't fill the whole screen
+		while (temp ~= 0 and #objects < 203) do
+			--give the table a maximum size of 20 so it doesn't go past the screen
 			table.insert(objects,{temp})
 			temp2 = temp
 			temp = memory.readdword(temp2)
@@ -173,6 +183,30 @@ function createObjectArray()
 
 	for i=1,#objects do
 		setObjectDetails(i, objects[i][1])
+	end
+
+	--real objects
+	for i=1,#baseObjects do
+		baseObjects[i] = nil
+	end
+
+	for i=0x1,0xc do
+		temp = memory.readdword(0x02049df0+4*(i-1))
+		while (temp ~= 0 and #baseObjects < 23) do
+			--give the table a maximum size of 20 so it doesn't go past the screen
+			table.insert(baseObjects,{temp})
+			temp2 = temp
+			temp = memory.readdword(temp2)
+		end
+	end
+
+	--mot details for normal objects. Maybe should move to setObjectDetails later
+	for i=0x1,#baseObjects do
+		table.insert(baseObjects[i],i)
+		table.insert(baseObjects[i],memory.readdwordsigned(baseObjects[i][1] + 0x80)/0x10000)
+		table.insert(baseObjects[i],memory.readdwordsigned(baseObjects[i][1] + 0x84)/0x10000)
+		table.insert(baseObjects[i],memory.readwordsigned(baseObjects[i][1] + 0x88))
+		table.insert(baseObjects[i],memory.readwordsigned(baseObjects[i][1] + 0x8a))
 	end
 end
 
@@ -195,42 +229,39 @@ function setObjectDetails(index,address)
 	table.insert(hitDetails, memory.readwordsigned(temp+0x4))--6: Dmg
 	table.insert(hitDetails, memory.readbyte(temp+0xa))--7: Efct
 	table.insert(hitDetails, memory.readbytesigned(temp+0xb))--8: Pwr
-
-	--MOT DETAILS:
-	local motDetails = {}
-	table.insert(objects[index], motDetails)
-
-	temp = memory.readdword(address+0x38)
-	table.insert(motDetails, temp)--1: Addr
-	table.insert(motDetails, memory.readdwordsigned(temp+0x80)/0x10000)--2: PosX
-	table.insert(motDetails, memory.readdwordsigned(temp+0x84)/0x10000)--3: PosY
-	table.insert(motDetails, memory.readwordsigned(temp+0x88))--4: SpeedX
-	table.insert(motDetails, memory.readwordsigned(temp+0x8a))--5: SpeedY
-
 end
 
 function drawHitBoxes()
-	for i=1, #objects do
+	local condition = (displayMode1 == 2 or displayMode2 == 2)
+	--use the condition for which table indeces to write
+	for i=#objects,1,-1 do
 		hitDetails = objects[i][3]
 		local EfctColor = getEfctColor(hitDetails[7])
 		gui.box(hitDetails[2],hitDetails[3]-191,hitDetails[4],hitDetails[5]-191,EfctColor, 0xF0F0F080)
-		gui.text(hitDetails[4]+1,hitDetails[3]-191,objects[i][2])
+		if condition then
+			gui.text(hitDetails[4]+1,hitDetails[3]-191,objects[i][2])
+		end
+	end
+
+	if not condition then
+		for i=#baseObjects,1,-1 do
+			gui.text(baseObjects[i][3]-screenX+1,baseObjects[i][4]-192-screenY,baseObjects[i][2])
+		end
 	end
 end
 
 function drawMotCenter()
-	for i=1,#objects do
-		motDetails = objects[i][4]
-		local color = 0x000080FF
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY,color)--middle
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY+1,color)--bottom
-		gui.pixel(motDetails[2]-screenX+1,motDetails[3]-192-screenY,color)--right
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY-1,color)--top
-		gui.pixel(motDetails[2]-screenX-1,motDetails[3]-192-screenY,color)--left
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY+2,color)--bottom
-		gui.pixel(motDetails[2]-screenX+2,motDetails[3]-192-screenY,color)--right
-		gui.pixel(motDetails[2]-screenX,motDetails[3]-192-screenY-2,color)--top
-		gui.pixel(motDetails[2]-screenX-2,motDetails[3]-192-screenY,color)--left
+	for i=1,#baseObjects do
+		local color = 0x80FFFFFF
+		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY,color)--middle
+		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY+1,color)--bottom
+		gui.pixel(baseObjects[i][3]-screenX+1,baseObjects[i][4]-192-screenY,color)--right
+		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY-1,color)--top
+		gui.pixel(baseObjects[i][3]-screenX-1,baseObjects[i][4]-192-screenY,color)--left
+		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY+2,color)--bottom
+		gui.pixel(baseObjects[i][3]-screenX+2,baseObjects[i][4]-192-screenY,color)--right
+		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY-2,color)--top
+		gui.pixel(baseObjects[i][3]-screenX-2,baseObjects[i][4]-192-screenY,color)--left
 	end
 end
 
