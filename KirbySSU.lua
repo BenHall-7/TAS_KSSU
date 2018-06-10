@@ -159,6 +159,7 @@ function drawMotDetails(Yoffset)
 		gui.text(0*(256/8), i*8+Yoffset, baseObjects[i][2])
 		gui.text(1*(256/8), i*8+Yoffset, baseObjects[i][3])
 		gui.text(3.5*(256/8), i*8+Yoffset, baseObjects[i][4])
+		--gui.text(6*(256/8), i*8+Yoffset, bit.tohex(baseObjects[i][1]))
 		gui.text(6*(256/8), i*8+Yoffset, baseObjects[i][5])
 		gui.text(7*(256/8), i*8+Yoffset, baseObjects[i][6])
 	end
@@ -173,7 +174,7 @@ function createObjectArray()
 	--initialize the object tables with addresses
 	for i=0x2,0x20 do --don't show command grab ranges because they block out stuff
 		temp = memory.readdword(0x02076f00+4*(i-1))
-		while (temp ~= 0 and #objects < 203) do
+		while (temp ~= 0 and #objects < 23) do
 			--give the table a maximum size of 20 so it doesn't go past the screen
 			table.insert(objects,{temp})
 			temp2 = temp
@@ -190,7 +191,7 @@ function createObjectArray()
 		baseObjects[i] = nil
 	end
 
-	for i=0x1,0xc do
+	for i=0x1,0x4 do
 		temp = memory.readdword(0x02049df0+4*(i-1))
 		while (temp ~= 0 and #baseObjects < 23) do
 			--give the table a maximum size of 20 so it doesn't go past the screen
