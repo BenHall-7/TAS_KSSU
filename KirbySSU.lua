@@ -1,4 +1,4 @@
-local displayMode1 = 1
+local displayMode1 = 2
 local displayMode2 = 3
 local display1Set = true
 local display2Set = true
@@ -175,7 +175,7 @@ function createObjectArray()
 	for i=0x2,0x20 do --don't show command grab ranges because they block out stuff
 		temp = memory.readdword(0x02076f00+4*(i-1))
 		while (temp ~= 0 and #objects < 23) do
-			--give the table a maximum size of 20 so it doesn't go past the screen
+			--give the table a maximum size of 23 so it doesn't go past the screen
 			table.insert(objects,{temp})
 			temp2 = temp
 			temp = memory.readdword(temp2)
@@ -191,10 +191,10 @@ function createObjectArray()
 		baseObjects[i] = nil
 	end
 
-	for i=0x1,0x4 do
-		temp = memory.readdword(0x02049df0+4*(i-1))
+	for i=0x1,0x7 do
+		temp = memory.readdword(0x02049dec+4*(i-1))
 		while (temp ~= 0 and #baseObjects < 23) do
-			--give the table a maximum size of 20 so it doesn't go past the screen
+			--give the table a maximum size of 23 so it doesn't go past the screen
 			table.insert(baseObjects,{temp})
 			temp2 = temp
 			temp = memory.readdword(temp2)
@@ -204,6 +204,7 @@ function createObjectArray()
 	--mot details for normal objects. Maybe should move to setObjectDetails later
 	for i=0x1,#baseObjects do
 		table.insert(baseObjects[i],i)
+		--Speed/Position
 		table.insert(baseObjects[i],memory.readdwordsigned(baseObjects[i][1] + 0x80)/0x10000)
 		table.insert(baseObjects[i],memory.readdwordsigned(baseObjects[i][1] + 0x84)/0x10000)
 		table.insert(baseObjects[i],memory.readwordsigned(baseObjects[i][1] + 0x88))
@@ -230,6 +231,7 @@ function setObjectDetails(index,address)
 	table.insert(hitDetails, memory.readwordsigned(temp+0x4))--6: Dmg
 	table.insert(hitDetails, memory.readbyte(temp+0xa))--7: Efct
 	table.insert(hitDetails, memory.readbytesigned(temp+0xb))--8: Pwr
+	table.insert(hitDetails, memory.readword(address+0x238))--9: HP
 end
 
 function drawHitBoxes()
@@ -240,7 +242,10 @@ function drawHitBoxes()
 		local EfctColor = getEfctColor(hitDetails[7])
 		gui.box(hitDetails[2],hitDetails[3]-191,hitDetails[4],hitDetails[5]-191,EfctColor, 0xF0F0F080)
 		if condition then
-			gui.text(hitDetails[4]+1,hitDetails[3]-191,objects[i][2])
+			gui.text(hitDetails[4]+1,hitDetails[3]-190,objects[i][2])
+			if objects[i][3][9] > 0 then
+				gui.text(hitDetails[4]-3,hitDetails[3]-200,objects[i][3][9], 0xFF0000C0)
+			end
 		end
 	end
 
