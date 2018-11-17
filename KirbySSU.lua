@@ -136,14 +136,14 @@ function drawhitDetails(Yoffset)
 	gui.drawbox(0,Yoffset-1,127,(#objects+1)*8+Yoffset-1,0x00000080,0x000000FF)
 	gui.text(0*(256/8),Yoffset,"Indx")
 	gui.text(1*(256/8),Yoffset,"Dmg")
-	gui.text(2*(256/8),Yoffset,"Efct")
+	gui.text(2*(256/8),Yoffset,"Efc")
 	gui.text(3*(256/8),Yoffset,"Pwr")
 	for i=1,#objects do
-		gui.text(0*(256/8), i*8+Yoffset, objects[i][2])--index
-		gui.text(1*(256/8), i*8+Yoffset, objects[i][3][6])--dmg
-		local efct = getEfctName(objects[i][3][7])--efct
-		gui.text(2*(256/8), i*8+Yoffset, efct)--writes a text name for efct
-		gui.text(3*(256/8), i*8+Yoffset, objects[i][3][8])--pwr
+		gui.text(0*(256/8), i*8+Yoffset, objects[i].index)--index
+		gui.text(1*(256/8), i*8+Yoffset, objects[i].hitDetails.dmg)--dmg
+		local efc = getEfctName(objects[i].hitDetails.efc)--efc
+		gui.text(2*(256/8), i*8+Yoffset, efc)--writes a text name for efc
+		gui.text(3*(256/8), i*8+Yoffset, objects[i].hitDetails.pwr)--pwr
 	end
 end
 
@@ -156,34 +156,33 @@ function drawMotDetails(Yoffset)
 	gui.text(6*(256/8), Yoffset, "SpdX")
 	gui.text(7*(256/8), Yoffset, "SpdY")
 	for i=1,#baseObjects do
-		gui.text(0*(256/8), i*8+Yoffset, baseObjects[i][2])
-		gui.text(1*(256/8), i*8+Yoffset, baseObjects[i][3])
-		gui.text(3.5*(256/8), i*8+Yoffset, baseObjects[i][4])
-		--gui.text(6*(256/8), i*8+Yoffset, bit.tohex(baseObjects[i][1]))
-		gui.text(6*(256/8), i*8+Yoffset, baseObjects[i][5])
-		gui.text(7*(256/8), i*8+Yoffset, baseObjects[i][6])
+		gui.text(0*(256/8), i*8+Yoffset, baseObjects[i].index)
+		gui.text(1*(256/8), i*8+Yoffset, baseObjects[i].x)
+		gui.text(3.5*(256/8), i*8+Yoffset, baseObjects[i].y)
+		gui.text(6*(256/8), i*8+Yoffset, baseObjects[i].spd_x)
+		gui.text(7*(256/8), i*8+Yoffset, baseObjects[i].spd_y)
 	end
 end
 
 function createObjectArray()
 	--clear any objects in the table
-	for i=1,#objects do
-		objects[i] = nil
-	end
+	objects = {}
 
 	--initialize the object tables with addresses
-	for i=0x2,0x20 do --don't show command grab ranges because they block out stuff
+	for i=0x2,0x20 do --grab range = 1. Don't display
 		temp = memory.readdword(0x02076f00+4*(i-1))
 		while (temp ~= 0 and #objects < 23) do
-			--give the table a maximum size of 23 so it doesn't go past the screen
-			table.insert(objects,{temp})
-			temp2 = temp
-			temp = memory.readdword(temp2)
+			table.insert(objects, {
+				addr = temp,
+				index = nil,
+				hitDetails = {}
+			})
+			temp = memory.readdword(temp)
 		end
 	end
 
 	for i=1,#objects do
-		setObjectDetails(i, objects[i][1])
+		setObjectDetails(i, objects[i].addr)
 	end
 
 	--real objects
@@ -195,79 +194,85 @@ function createObjectArray()
 		temp = memory.readdword(0x02049dec+4*(i-1))
 		while (temp ~= 0 and #baseObjects < 23) do
 			--give the table a maximum size of 23 so it doesn't go past the screen
-			table.insert(baseObjects,{temp})
-			temp2 = temp
-			temp = memory.readdword(temp2)
+			table.insert(baseObjects, { 
+				addr = temp,
+				index = nil,
+				x = nil,
+				y = nil,
+				spd_x = nil,
+				spd_y = nil
+			})
+			temp = memory.readdword(temp)
 		end
 	end
 
 	--mot details for normal objects. Maybe should move to setObjectDetails later
 	for i=0x1,#baseObjects do
-		table.insert(baseObjects[i],i)
-		--Speed/Position
-		table.insert(baseObjects[i],memory.readdwordsigned(baseObjects[i][1] + 0x80)/0x10000)
-		table.insert(baseObjects[i],memory.readdwordsigned(baseObjects[i][1] + 0x84)/0x10000)
-		table.insert(baseObjects[i],memory.readwordsigned(baseObjects[i][1] + 0x88))
-		table.insert(baseObjects[i],memory.readwordsigned(baseObjects[i][1] + 0x8a))
+		temp = baseObjects[i].addr
+		baseObjects[i].index = i
+		baseObjects[i].x = memory.readdwordsigned(temp + 0x80)/0x10000
+		baseObjects[i].y = memory.readdwordsigned(temp + 0x84)/0x10000
+		baseObjects[i].spd_x = memory.readwordsigned(temp + 0x88)
+		baseObjects[i].spd_y = memory.readwordsigned(temp + 0x8a)
 	end
 end
 
 function setObjectDetails(index,address)
-	--objects = {{object1}, {object2}...} where
-	--{object#} = {Main Address, Index, {Hit Details}, {Mot details}...}
-
-	table.insert(objects[index], index)--object[i][2] = index in the list
-
-	--HIT DETAILS:
-	local hitDetails = {}
-	table.insert(objects[index],hitDetails)
+	objects[index].index = index
 
 	temp = memory.readdword(address+0x14)
-	table.insert(hitDetails, temp)--1: Address of hitboxes
-	table.insert(hitDetails, memory.readwordsigned(address+0x24)-screenX)--2: X1
-	table.insert(hitDetails, memory.readwordsigned(address+0x26)-screenY)--3: Y1
-	table.insert(hitDetails, memory.readwordsigned(address+0x28)-screenX)--4: X2
-	table.insert(hitDetails, memory.readwordsigned(address+0x2a)-screenY)--5: Y2
-	table.insert(hitDetails, memory.readwordsigned(temp+0x4))--6: Dmg
-	table.insert(hitDetails, memory.readbyte(temp+0xa))--7: Efct
-	table.insert(hitDetails, memory.readbytesigned(temp+0xb))--8: Pwr
-	table.insert(hitDetails, memory.readword(address+0x238))--9: HP
+	objects[index].hitDetails = {
+		hit_addr = temp,
+		x1 = memory.readwordsigned(address+0x24),
+		y1 = memory.readwordsigned(address+0x26),
+		x2 = memory.readwordsigned(address+0x28),
+		y2 = memory.readwordsigned(address+0x2a),
+		hp = memory.readword(address+0x238),
+		dmg = memory.readwordsigned(temp+0x14),
+		efc = memory.readbyte(temp+0xa),
+		pwr = memory.readbytesigned(temp+0xb)
+	}
 end
 
 function drawHitBoxes()
 	local condition = (displayMode1 == 2 or displayMode2 == 2)
 	--use the condition for which table indeces to write
 	for i=#objects,1,-1 do
-		hitDetails = objects[i][3]
-		local EfctColor = getEfctColor(hitDetails[7])
-		gui.box(hitDetails[2],hitDetails[3]-191,hitDetails[4],hitDetails[5]-191,EfctColor, 0xF0F0F080)
+		hitDetails = objects[i].hitDetails
+		local EfctColor = getEfctColor(hitDetails.efc)
+		gui.box(hitDetails.x1 - screenX, hitDetails.y1 - 191 - screenY,
+			hitDetails.x2 - screenX, hitDetails.y2 - 191 - screenY,
+			EfctColor, 0xF0F0F080)
 		if condition then
-			gui.text(hitDetails[4]+1,hitDetails[3]-190,objects[i][2])
-			if objects[i][3][9] > 0 then
-				gui.text(hitDetails[4]-3,hitDetails[3]-200,objects[i][3][9], 0xFF0000C0)
+			gui.text(hitDetails.x2 - screenX, hitDetails.y2 - screenY - 191,
+				objects[i].index)
+			if objects[i].hitDetails.hp > 0 then
+				gui.text(hitDetails.x2 - screenX, hitDetails.y1 - screenY - 199,
+				hitDetails.hp, 0xFF0000C0)
 			end
 		end
 	end
 
 	if not condition then
 		for i=#baseObjects,1,-1 do
-			gui.text(baseObjects[i][3]-screenX+1,baseObjects[i][4]-192-screenY,baseObjects[i][2])
+			gui.text(baseObjects[i].x - screenX + 1, baseObjects[i].y - 192 - screenY,
+			baseObjects[i].index)
 		end
 	end
 end
 
 function drawMotCenter()
 	for i=1,#baseObjects do
-		local color = 0x80FFFFFF
-		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY,color)--middle
-		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY+1,color)--bottom
-		gui.pixel(baseObjects[i][3]-screenX+1,baseObjects[i][4]-192-screenY,color)--right
-		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY-1,color)--top
-		gui.pixel(baseObjects[i][3]-screenX-1,baseObjects[i][4]-192-screenY,color)--left
-		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY+2,color)--bottom
-		gui.pixel(baseObjects[i][3]-screenX+2,baseObjects[i][4]-192-screenY,color)--right
-		gui.pixel(baseObjects[i][3]-screenX,baseObjects[i][4]-192-screenY-2,color)--top
-		gui.pixel(baseObjects[i][3]-screenX-2,baseObjects[i][4]-192-screenY,color)--left
+		local cl = 0x80FFFFFF
+		gui.pixel(baseObjects[i].x - screenX, baseObjects[i].y - 192 - screenY,cl)
+		gui.pixel(baseObjects[i].x - screenX, baseObjects[i].y - 192 - screenY + 1,cl)
+		gui.pixel(baseObjects[i].x - screenX + 1, baseObjects[i].y - 192 - screenY,cl)
+		gui.pixel(baseObjects[i].x - screenX, baseObjects[i].y - 192 - screenY - 1,cl)
+		gui.pixel(baseObjects[i].x - screenX - 1, baseObjects[i].y - 192 - screenY,cl)
+		gui.pixel(baseObjects[i].x - screenX, baseObjects[i].y - 192 - screenY + 2,cl)
+		gui.pixel(baseObjects[i].x - screenX + 2, baseObjects[i].y - 192 - screenY,cl)
+		gui.pixel(baseObjects[i].x - screenX, baseObjects[i].y - 192 - screenY - 2,cl)
+		gui.pixel(baseObjects[i].x - screenX - 2, baseObjects[i].y - 192 - screenY,cl)
 	end
 end
 
@@ -287,7 +292,7 @@ function getEfctName(EffectID)
 	elseif EffectID == 5 then
 		name = "elec"
 	else
-		name = string.format("0x".."%x",EffectID)
+		name = EffectID
 	end
 
 	return name
